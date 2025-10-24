@@ -1,1 +1,12 @@
-full contents of package.json
+{
+  "name": "clubpro",
+  "version": "1.0.0",
+  "description": "A comprehensive management application for clubs.",
+  "scripts": {
+    "build:css": "tailwindcss -i ./input.css -o ./styles.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5.7",
+    "tailwindcss": "^3.4.1"
+  }
+}

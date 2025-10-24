@@ -38,7 +38,7 @@ The entire application is powered by a sophisticated mock API service, allowing 
 ## 🛠️ Technology Stack
 
 *   **Frontend:** **React.js** & **TypeScript**
-*   **Styling:** **Tailwind CSS** (via CDN for rapid prototyping)
+*   **Styling:** **Tailwind CSS** (via CDN for simplicity)
 *   **State Management:** **React Context API** for managing global authentication state.
 *   **Backend Simulation:** A comprehensive **mock API service** (`/services/api.ts`) that simulates a real backend, handling all data operations, business logic, and simulated delays.
 
@@ -46,15 +46,8 @@ The entire application is powered by a sophisticated mock API service, allowing 
 
 This is a self-contained application and requires **no build step or package installation**.
 
-1.  Clone the repository:
-    ```bash
-    git clone <repository-url>
-    ```
-2.  Navigate into the project directory:
-    ```bash
-    cd <repository-directory>
-    ```
-3.  Serve the files using any static file server. Here are two common options:
+1.  Clone the repository.
+2.  Serve the files using any static file server. For example:
 
     *   **Using Python:**
         ```bash
@@ -64,7 +57,7 @@ This is a self-contained application and requires **no build step or package ins
         ```bash
         npx serve
         ```
-4.  Open your browser and navigate to the local URL provided by the server (e.g., `http://localhost:8000`).
+3.  Open your browser and navigate to the local URL provided by the server (e.g., `http://localhost:8000`).
 
 ### Default Logins
 *   **Admin:** `admin@cricket.com` / `password`
