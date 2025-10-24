@@ -1,183 +1,246 @@
 import {
   User,
-  Payment,
-  Event,
   UserRole,
   UserStatus,
+  Payment,
   PaymentStatus,
+  Event,
   Expense,
-  Payment as TPayment,
 } from '../types';
 import { mockData } from '../data/mockData';
 
-// Simulate a database
-let db = {
-  users: [...mockData.users],
-  payments: [...mockData.payments],
-  events: [...mockData.events],
-  expenses: [...mockData.expenses],
-  paymentQRCodeUrl: mockData.paymentQRCodeUrl,
-};
-
-// Helper to simulate API delay
+// Helper to simulate network delay
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
+// Helper to generate IDs
 const generateId = () => Math.random().toString(36).substr(2, 9);
+
+let users = [...mockData.users];
+let payments = [...mockData.payments];
+let events = [...mockData.events];
+let expenses = [...mockData.expenses];
+let paymentQRCodeUrl = mockData.paymentQRCodeUrl;
+
+// Simulate a password store
+const passwords: { [userId: string]: string } = {
+    'admin1': 'password',
+    'member1': 'password',
+    'member2': 'password',
+    'member3': 'password',
+};
 
 
 export const api = {
   login: async (email: string, password: string): Promise<User> => {
     await delay(500);
-    const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    // In a real app, you'd check a hashed password. Here we allow any password for a found user.
-    if (user && password) {
-      return user;
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    if (user && passwords[user._id] === password) {
+      return Promise.resolve(user);
     }
-    throw new Error('Invalid credentials');
+    return Promise.reject(new Error('Invalid credentials'));
   },
   
-  getAllUsers: async (): Promise<User[]> => {
-    await delay(300);
-    return [...db.users];
+  register: async (data: { name: string, email: string, phone: string, password: string }): Promise<User> => {
+      await delay(700);
+      if (users.some(u => u.email.toLowerCase() === data.email.toLowerCase())) {
+          return Promise.reject(new Error("An account with this email already exists."));
+      }
+      
+      const newUser: User = {
+          _id: generateId(),
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          role: UserRole.MEMBER,
+          status: UserStatus.ACTIVE,
+          avatar: `https://i.pravatar.cc/150?u=${generateId()}`,
+          joinDate: new Date().toISOString(),
+      };
+      
+      users = [newUser, ...users];
+      passwords[newUser._id] = data.password;
+      
+      return Promise.resolve(newUser);
   },
 
-  addUser: async (userData: Omit<User, '_id' | 'joinDate' | 'avatar'>): Promise<User> => {
+  getAllUsers: async (): Promise<User[]> => {
+    await delay(500);
+    return Promise.resolve(users);
+  },
+
+  addUser: async (userData: Omit<User, '_id' | 'avatar' | 'joinDate'>): Promise<User> => {
     await delay(500);
     const newUser: User = {
       _id: generateId(),
       ...userData,
-      joinDate: new Date().toISOString(),
       avatar: `https://i.pravatar.cc/150?u=${generateId()}`,
+      joinDate: new Date().toISOString(),
     };
-    db.users.push(newUser);
-    return newUser;
+    users = [newUser, ...users];
+    // Assign a default password for admin-added users
+    passwords[newUser._id] = 'password';
+    return Promise.resolve(newUser);
   },
 
   updateUser: async (userId: string, updates: Partial<User>): Promise<User> => {
-      await delay(500);
-      let userToUpdate = db.users.find(u => u._id === userId);
-      if (!userToUpdate) throw new Error('User not found');
-      
-      const originalName = userToUpdate.name;
-      const updatedUser = { ...userToUpdate, ...updates };
-      db.users = db.users.map(u => u._id === userId ? updatedUser : u);
-      
-      // If name changed, update it in payments for consistency
-      if (updates.name && updates.name !== originalName) {
-        db.payments = db.payments.map(p => p.userId === userId ? { ...p, userName: updates.name as string } : p);
+    await delay(500);
+    let updatedUser: User | undefined;
+    users = users.map(u => {
+      if (u._id === userId) {
+        updatedUser = { ...u, ...updates };
+        return updatedUser;
       }
-      if (updates.avatar) {
-        db.payments = db.payments.map(p => p.userId === userId ? { ...p, userAvatar: updates.avatar as string } : p);
+      return u;
+    });
+    if (updatedUser) {
+      // Also update payment author info if name/avatar changed
+      if (updates.name || updates.avatar) {
+        payments = payments.map(p => p.userId === userId ? {...p, userName: updatedUser!.name, userAvatar: updatedUser!.avatar} : p);
       }
-
-      return updatedUser;
+      return Promise.resolve(updatedUser);
+    }
+    return Promise.reject(new Error('User not found'));
   },
 
   deleteUser: async (userId: string): Promise<void> => {
-      await delay(500);
-      db.users = db.users.filter(u => u._id !== userId);
-      // Also delete related payments
-      db.payments = db.payments.filter(p => p.userId !== userId);
+    await delay(500);
+    const userExists = users.some(u => u._id === userId);
+    if (userExists) {
+        users = users.filter(u => u._id !== userId);
+        delete passwords[userId];
+        return Promise.resolve();
+    }
+    return Promise.reject(new Error('User not found'));
   },
 
-  getDashboardStats: async (userId: string, role: UserRole) => {
-    await delay(400);
+  getDashboardStats: async (userId: string, role: UserRole): Promise<any> => {
+    await delay(500);
     if (role === UserRole.ADMIN) {
+      const totalRevenue = payments
+        .filter(p => p.status === PaymentStatus.PAID)
+        .reduce((sum, p) => sum + p.amount, 0);
+      const pendingVerifications = payments.filter(p => p.status === PaymentStatus.PENDING && p.proofDocument).length;
       return {
-        totalMembers: db.users.filter(u => u.role === UserRole.MEMBER).length,
-        totalRevenue: db.payments.filter(p => p.status === PaymentStatus.PAID).reduce((sum, p) => sum + p.amount, 0),
-        pendingVerifications: db.payments.filter(p => p.status === PaymentStatus.PENDING && p.proofDocument).length,
-        upcomingEvents: db.events.length,
+        totalMembers: users.filter(u => u.role === UserRole.MEMBER).length,
+        totalRevenue,
+        pendingVerifications,
+        upcomingEvents: events.length,
       };
     } else {
-      const userPayments = db.payments.filter(p => p.userId === userId);
+      const userPayments = payments.filter(p => p.userId === userId);
+      const pendingPayments = userPayments.filter(p => p.status === PaymentStatus.PENDING || p.status === PaymentStatus.OVERDUE).length;
+      const totalPaid = userPayments
+        .filter(p => p.status === PaymentStatus.PAID)
+        .reduce((sum, p) => sum + p.amount, 0);
       return {
-        pendingPayments: userPayments.filter(p => p.status === PaymentStatus.PENDING || p.status === PaymentStatus.OVERDUE).length,
-        totalPaid: userPayments.filter(p => p.status === PaymentStatus.PAID).reduce((sum, p) => sum + p.amount, 0),
-        upcomingEvents: db.events.length,
+        pendingPayments,
+        totalPaid,
+        upcomingEvents: events.length,
       };
     }
   },
-
-  getRecentPayments: async (): Promise<Payment[]> => {
-      await delay(300);
-      return [...db.payments]
-          .filter(p => p.status === PaymentStatus.PAID)
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-          .slice(0, 5);
-  },
-  
-  getUpcomingEvents: async (): Promise<Event[]> => {
-    await delay(300);
-    return [...db.events].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  },
   
   getPaymentsForUser: async (userId: string): Promise<Payment[]> => {
+    await delay(500);
+    return Promise.resolve(payments.filter(p => p.userId === userId).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  },
+
+  getAllPayments: async (): Promise<Payment[]> => {
       await delay(500);
-      return [...db.payments]
-          .filter(p => p.userId === userId)
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      return Promise.resolve(payments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   },
-  
-  submitPaymentProof: async (paymentId: string, proofUrl: string): Promise<Payment> => {
-      await delay(800);
-      const payment = db.payments.find(p => p._id === paymentId);
-      if (!payment) throw new Error('Payment not found');
-      payment.proofDocument = proofUrl;
-      return { ...payment };
+
+  getRecentPayments: async (): Promise<Payment[]> => {
+      await delay(500);
+      return Promise.resolve(
+          payments
+              .filter(p => p.status === PaymentStatus.PAID)
+              .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              .slice(0, 5)
+      );
   },
-  
+
   getPendingPayments: async (): Promise<Payment[]> => {
       await delay(500);
-      return db.payments.filter(p => p.status === PaymentStatus.PENDING && !!p.proofDocument);
+      return Promise.resolve(payments.filter(p => p.status === PaymentStatus.PENDING && p.proofDocument));
+  },
+
+  submitPaymentProof: async (paymentId: string, proofDocument: string): Promise<Payment> => {
+      await delay(500);
+      let updatedPayment: Payment | undefined;
+      payments = payments.map(p => {
+          if (p._id === paymentId) {
+              updatedPayment = { ...p, proofDocument };
+              return updatedPayment;
+          }
+          return p;
+      });
+      if (updatedPayment) return Promise.resolve(updatedPayment);
+      return Promise.reject(new Error('Payment not found'));
+  },
+
+  verifyPayment: async (paymentId: string, status: PaymentStatus, adminNotes: string, verifiedBy: string): Promise<Payment> => {
+      await delay(500);
+      let updatedPayment: Payment | undefined;
+      payments = payments.map(p => {
+          if (p._id === paymentId) {
+              updatedPayment = { ...p, status, adminNotes, verifiedBy };
+              return updatedPayment;
+          }
+          return p;
+      });
+      if (updatedPayment) return Promise.resolve(updatedPayment);
+      return Promise.reject(new Error('Payment not found'));
   },
   
-  verifyPayment: async (paymentId: string, newStatus: PaymentStatus, adminNotes: string, verifiedBy: string): Promise<Payment> => {
-      await delay(600);
-      const payment = db.payments.find(p => p._id === paymentId);
-      if (!payment) throw new Error('Payment not found');
-      payment.status = newStatus;
-      payment.adminNotes = adminNotes;
-      payment.verifiedBy = verifiedBy;
-      return { ...payment };
-  },
-
-  createPaymentRequest: async (req: { userId: string, type: string, amount: number, dueDate: string }): Promise<Payment> => {
+  createPaymentRequest: async (data: { userId: string; type: string; amount: number; dueDate: string }): Promise<Payment> => {
       await delay(500);
-      const user = db.users.find(u => u._id === req.userId);
-      if (!user) throw new Error('User not found');
-      const newPayment: TPayment = {
-        _id: generateId(),
-        userId: user._id,
-        userName: user.name,
-        userAvatar: user.avatar,
-        type: req.type,
-        amount: req.amount,
-        status: PaymentStatus.PENDING,
-        date: new Date().toISOString(),
-        dueDate: new Date(req.dueDate).toISOString(),
-        paymentMethod: 'UPI', // Default
+      const user = users.find(u => u._id === data.userId);
+      if (!user) return Promise.reject(new Error('User not found'));
+
+      const newPayment: Payment = {
+          _id: generateId(),
+          userId: user._id,
+          userName: user.name,
+          userAvatar: user.avatar,
+          type: data.type,
+          amount: data.amount,
+          status: PaymentStatus.PENDING,
+          date: new Date().toISOString(),
+          dueDate: new Date(data.dueDate).toISOString(),
+          paymentMethod: '',
       };
-      db.payments.unshift(newPayment);
-      return newPayment;
+      payments = [newPayment, ...payments];
+      return Promise.resolve(newPayment);
+  },
+  
+  createBulkPaymentRequest: async (data: { userIds: string[]; type: string; amount: number; dueDate: string }): Promise<void> => {
+      await delay(1000);
+      const newPayments: Payment[] = [];
+      for (const userId of data.userIds) {
+          const user = users.find(u => u._id === userId);
+          if (user) {
+              newPayments.push({
+                  _id: generateId(),
+                  userId: user._id,
+                  userName: user.name,
+                  userAvatar: user.avatar,
+                  type: data.type,
+                  amount: data.amount,
+                  status: PaymentStatus.PENDING,
+                  date: new Date().toISOString(),
+                  dueDate: new Date(data.dueDate).toISOString(),
+                  paymentMethod: '',
+              });
+          }
+      }
+      payments = [...newPayments, ...payments];
+      return Promise.resolve();
   },
 
-  createBulkPaymentRequest: async (req: { userIds: string[], type: string, amount: number, dueDate: string }): Promise<void> => {
-      await delay(1000);
-      const users = db.users.filter(u => req.userIds.includes(u._id));
-      const newPayments: TPayment[] = users.map(user => ({
-         _id: generateId(),
-        userId: user._id,
-        userName: user.name,
-        userAvatar: user.avatar,
-        type: req.type,
-        amount: req.amount,
-        status: PaymentStatus.PENDING,
-        date: new Date().toISOString(),
-        dueDate: new Date(req.dueDate).toISOString(),
-        paymentMethod: 'UPI', // Default
-      }));
-      db.payments.unshift(...newPayments);
+  getUpcomingEvents: async (): Promise<Event[]> => {
+      await delay(500);
+      return Promise.resolve(events.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
   },
 
   addEvent: async (eventData: Omit<Event, '_id'>): Promise<Event> => {
@@ -185,91 +248,81 @@ export const api = {
       const newEvent: Event = {
           _id: generateId(),
           ...eventData,
+          attendees: [],
       };
-      db.events.push(newEvent);
-      return newEvent;
-  },
-  
-  getPaymentQRCode: async (): Promise<string> => {
-      await delay(100);
-      return db.paymentQRCodeUrl;
+      events = [newEvent, ...events];
+      return Promise.resolve(newEvent);
   },
 
-  setPaymentQRCode: async (newUrl: string): Promise<void> => {
-      await delay(400);
-      db.paymentQRCodeUrl = newUrl;
-  },
-  
-  addExpense: async (expenseData: Omit<Expense, '_id'>): Promise<Expense> => {
-      await delay(500);
-      const newExpense: Expense = {
-          _id: generateId(),
-          ...expenseData,
-      };
-      db.expenses.push(newExpense);
-      return newExpense;
-  },
-
-  getAllExpenses: async (): Promise<Expense[]> => {
-      await delay(300);
-      return [...db.expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  },
-  
-  getAllPayments: async (): Promise<Payment[]> => {
-      await delay(500);
-      return [...db.payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  },
-  
   getEventPaymentStatus: async (eventId: string): Promise<any[]> => {
       await delay(700);
-      const eventPayments = db.payments.filter(p => p.eventId === eventId);
-      const members = db.users.filter(u => u.role === UserRole.MEMBER && u.status === UserStatus.ACTIVE);
+      const event = events.find(e => e._id === eventId);
+      if (!event) return Promise.reject(new Error("Event not found"));
       
-      return members.map(member => {
+      const allMembers = users.filter(u => u.role === UserRole.MEMBER);
+      const eventPayments = payments.filter(p => p.eventId === eventId);
+
+      const statuses = allMembers.map(member => {
           const payment = eventPayments.find(p => p.userId === member._id);
-          const status: PaymentStatus | 'Not Paid' = payment ? payment.status : 'Not Paid';
+          const status = payment ? payment.status : 'Not Paid';
           return {
               memberId: member._id,
               memberName: member.name,
-              status: status,
-          };
+              status: status as PaymentStatus | 'Not Paid',
+          }
       });
+      return Promise.resolve(statuses);
   },
   
   notifyUnpaidMembersForEvent: async (eventId: string): Promise<void> => {
       await delay(1000);
+      // Simulate sending notifications
       console.log(`Simulating sending notifications for event ${eventId}`);
-      // In a real app, this would trigger an email or push notification service.
-      return;
-  },
-
-  getFinancialSummary: async () => {
-    await delay(400);
-    const totalRevenue = db.payments
-        .filter(p => p.status === PaymentStatus.PAID)
-        .reduce((sum, p) => sum + p.amount, 0);
-    const totalExpenses = db.expenses.reduce((sum, e) => sum + e.amount, 0);
-    return {
-        totalRevenue,
-        totalExpenses,
-        netProfit: totalRevenue - totalExpenses,
-    };
+      return Promise.resolve();
   },
   
-  sendEmailNotification: async (payload: { userId: string, subject: string, message: string }): Promise<void> => {
-    await delay(1000);
-    const user = db.users.find(u => u._id === payload.userId);
-    if (!user) throw new Error("User not found to send email to.");
-    console.log(`
-      ========================================
-      == SIMULATING EMAIL NOTIFICATION ==
-      ========================================
-      TO: ${user.name} <${user.email}>
-      SUBJECT: ${payload.subject}
-      ----------------------------------------
-      MESSAGE:
-      ${payload.message}
-      ========================================
-    `);
+  sendEmailNotification: async (data: { userId: string, subject: string, message: string}): Promise<void> => {
+      await delay(800);
+      console.log(`Simulating email to user ${data.userId} with subject "${data.subject}"`);
+      return Promise.resolve();
+  },
+
+  getAllExpenses: async (): Promise<Expense[]> => {
+    await delay(500);
+    return Promise.resolve(expenses);
+  },
+
+  addExpense: async (expenseData: Omit<Expense, '_id'>): Promise<Expense> => {
+    await delay(500);
+    const newExpense: Expense = {
+      _id: generateId(),
+      ...expenseData,
+    };
+    expenses = [newExpense, ...expenses];
+    return Promise.resolve(newExpense);
+  },
+
+  getFinancialSummary: async (): Promise<{ totalRevenue: number, totalExpenses: number, netProfit: number }> => {
+    await delay(600);
+    const totalRevenue = payments
+      .filter(p => p.status === PaymentStatus.PAID)
+      .reduce((sum, p) => sum + p.amount, 0);
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    return Promise.resolve({
+      totalRevenue,
+      totalExpenses,
+      netProfit: totalRevenue - totalExpenses,
+    });
+  },
+
+  setPaymentQRCode: async(url: string): Promise<void> => {
+    await delay(500);
+    paymentQRCodeUrl = url;
+    return Promise.resolve();
+  },
+
+  getPaymentQRCode: async(): Promise<string> => {
+    await delay(300);
+    return Promise.resolve(paymentQRCodeUrl);
   },
 };

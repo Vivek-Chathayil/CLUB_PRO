@@ -38,7 +38,7 @@ The entire application is powered by a sophisticated mock API service, allowing 
 ## 🛠️ Technology Stack
 
 *   **Frontend:** **React.js** & **TypeScript**
-*   **Styling:** **Tailwind CSS** for a utility-first, modern, and responsive UI.
+*   **Styling:** **Tailwind CSS** (via CDN for rapid prototyping)
 *   **State Management:** **React Context API** for managing global authentication state.
 *   **Backend Simulation:** A comprehensive **mock API service** (`/services/api.ts`) that simulates a real backend, handling all data operations, business logic, and simulated delays.
 
