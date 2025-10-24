@@ -1,5 +1,5 @@
 {
-  "name": "Cricket Club Pro",
-  "description": "A comprehensive management application for cricket clubs, featuring membership tracking, event scheduling, and a robust financial system with manual payment verification for administrators.",
+  "name": "Club Pro",
+  "description": "A comprehensive management application for clubs, featuring membership tracking, event scheduling, and a robust financial system with manual payment verification for administrators.",
   "requestFramePermissions": []
 }

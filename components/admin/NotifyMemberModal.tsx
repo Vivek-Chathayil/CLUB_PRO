@@ -22,7 +22,7 @@ export const NotifyMemberModal: React.FC<NotifyMemberModalProps> = ({ isOpen, on
     if (member) {
       // Pre-fill with a template
       setSubject('Regarding Your Account');
-      setMessage(`Dear ${member.name},\n\nWe are writing to you regarding your account at the Cricket Club.\n\nBest Regards,\nClub Administration`);
+      setMessage(`Dear ${member.name},\n\nWe are writing to you regarding your account at ClubPro.\n\nBest Regards,\nClubPro Administration`);
     }
   }, [member]);
   
