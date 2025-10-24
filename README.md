@@ -38,7 +38,8 @@ The entire application is powered by a sophisticated mock API service, allowing 
 ## 🛠️ Technology Stack
 
 *   **Frontend:** **React.js** & **TypeScript**
-*   **Styling:** **Tailwind CSS** (via CDN for simplicity)
+*   **Styling:** **Tailwind CSS** (via CDN)
+*   **In-Browser Transpilation:** **Babel Standalone** to run TSX/JSX directly in the browser without a build step.
 *   **State Management:** **React Context API** for managing global authentication state.
 *   **Backend Simulation:** A comprehensive **mock API service** (`/services/api.ts`) that simulates a real backend, handling all data operations, business logic, and simulated delays.
 

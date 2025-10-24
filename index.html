@@ -28,6 +28,7 @@
       }
     }
   </script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script type="importmap">
   {
     "imports": {
@@ -41,6 +42,6 @@
 <body class="bg-slate-900 antialiased">
   <noscript>You need to enable JavaScript to run this app.</noscript>
   <div id="root"></div>
-  <script type="module" src="./index.tsx"></script>
+  <script type="text/babel" data-type="module" src="./index.tsx"></script>
 </body>
 </html>
