@@ -10,6 +10,7 @@ import FinancialReport from '../reports/FinancialReport';
 import { ExpensesList } from './ExpensesList';
 import { Notification } from '../ui/Notification';
 import { SetPaymentQRModal } from './SetPaymentQRModal';
+import { AddExpenseForm } from './AddExpenseForm';
 
 interface AdminFinancePageProps {
   user: User;
@@ -27,6 +28,7 @@ const AdminFinancePage: React.FC<AdminFinancePageProps> = ({ user }) => {
     const [loading, setLoading] = useState(true);
     const [isBulkModalOpen, setBulkModalOpen] = useState(false);
     const [isSetQRModalOpen, setSetQRModalOpen] = useState(false);
+    const [isAddExpenseModalOpen, setAddExpenseModalOpen] = useState(false);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [activeTab, setActiveTab] = useState('payments');
 
@@ -47,17 +49,20 @@ const AdminFinancePage: React.FC<AdminFinancePageProps> = ({ user }) => {
     };
 
     useEffect(() => {
-        fetchData();
-    }, [dataVersion]);
+        if (activeTab === 'payments') {
+            fetchData();
+        }
+    }, [dataVersion, activeTab]);
 
-    const handleSuccess = () => {
+    const handleSuccess = (message: string = 'Action completed successfully!') => {
         setDataVersion(v => v + 1); // Trigger re-fetch in main component and children
         setBulkModalOpen(false);
-        setNotification({ message: 'Action completed successfully!', type: 'success' });
+        setAddExpenseModalOpen(false);
+        setNotification({ message, type: 'success' });
     };
     
     const renderContent = () => {
-        if (loading) return <Spinner />;
+        if (loading && activeTab === 'payments') return <Spinner />;
         
         switch (activeTab) {
             case 'payments':
@@ -95,7 +100,14 @@ const AdminFinancePage: React.FC<AdminFinancePageProps> = ({ user }) => {
                      </div>
                 );
             case 'expenses':
-                return <ExpensesList key={dataVersion} />; // Use key to force re-render
+                return (
+                    <div>
+                        <div className="flex justify-end p-4">
+                            <Button onClick={() => setAddExpenseModalOpen(true)}>Add Expense</Button>
+                        </div>
+                        <ExpensesList key={dataVersion} />
+                    </div>
+                );
             case 'reports':
                 return <FinancialReport />;
             default:
@@ -126,8 +138,9 @@ const AdminFinancePage: React.FC<AdminFinancePageProps> = ({ user }) => {
                 </Card>
             </div>
             
-            <BulkPaymentRequestForm isOpen={isBulkModalOpen} onClose={() => setBulkModalOpen(false)} onPaymentsCreated={handleSuccess} />
+            <BulkPaymentRequestForm isOpen={isBulkModalOpen} onClose={() => setBulkModalOpen(false)} onPaymentsCreated={() => handleSuccess('Bulk payment requests sent!')} />
             <SetPaymentQRModal isOpen={isSetQRModalOpen} onClose={() => setSetQRModalOpen(false)} onSave={() => setNotification({ message: 'QR Code updated!', type: 'success' })} />
+            <AddExpenseForm isOpen={isAddExpenseModalOpen} onClose={() => setAddExpenseModalOpen(false)} onExpenseAdded={() => handleSuccess('Expense added successfully!')} adminUser={user} />
         </>
     );
 };

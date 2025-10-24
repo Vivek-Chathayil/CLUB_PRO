@@ -1,3 +1,4 @@
+
 import {
   User,
   UserRole,
@@ -28,6 +29,9 @@ const passwords: { [userId: string]: string } = {
     'member2': 'password',
     'member3': 'password',
 };
+
+// Simulate password reset tokens
+const resetTokens: { [token: string]: string } = {};
 
 
 export const api = {
@@ -61,6 +65,31 @@ export const api = {
       passwords[newUser._id] = data.password;
       
       return Promise.resolve(newUser);
+  },
+
+  requestPasswordReset: async (email: string): Promise<string> => {
+    await delay(1000);
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    if (user) {
+        const token = `reset_${generateId()}`;
+        resetTokens[token] = user._id;
+        // In a real app, you would email this token to the user.
+        // We return it here for simulation purposes.
+        return Promise.resolve(token);
+    }
+    // Don't reveal if an email exists or not for security
+    return Promise.resolve("OK"); 
+  },
+
+  resetPassword: async (token: string, newPassword: string): Promise<void> => {
+      await delay(1000);
+      const userId = resetTokens[token];
+      if (userId && users.some(u => u._id === userId)) {
+          passwords[userId] = newPassword;
+          delete resetTokens[token];
+          return Promise.resolve();
+      }
+      return Promise.reject(new Error("Invalid or expired reset token."));
   },
 
   getAllUsers: async (): Promise<User[]> => {
@@ -128,6 +157,7 @@ export const api = {
       };
     } else {
       const userPayments = payments.filter(p => p.userId === userId);
+      // Corrected typo from OVERDUT to OVERDUE.
       const pendingPayments = userPayments.filter(p => p.status === PaymentStatus.PENDING || p.status === PaymentStatus.OVERDUE).length;
       const totalPaid = userPayments
         .filter(p => p.status === PaymentStatus.PAID)

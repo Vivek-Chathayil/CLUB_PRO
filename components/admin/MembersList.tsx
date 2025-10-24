@@ -8,8 +8,6 @@ import { Input } from '../ui/Input';
 import { useDebounce } from '../../hooks/useDebounce';
 import { formatDate } from '../../utils/helpers';
 import { AddMemberForm } from './AddMemberForm';
-import { EditMemberForm } from './EditMemberForm';
-import { ConfirmationModal } from '../ui/ConfirmationModal';
 import { MemberProfile } from './MemberProfile';
 import { Notification } from '../ui/Notification';
 
@@ -20,8 +18,6 @@ export const MembersList: React.FC = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   
   const [isAddModalOpen, setAddModalOpen] = useState(false);
-  const [isEditModalOpen, setEditModalOpen] = useState(false);
-  const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
   const [isProfileModalOpen, setProfileModalOpen] = useState(false);
   
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -58,34 +54,9 @@ export const MembersList: React.FC = () => {
     setNotification({ message: 'Member added successfully!', type: 'success' });
   };
   
-  const handleMemberUpdated = (updatedUser: User) => {
-      setUsers(users.map(u => u._id === updatedUser._id ? updatedUser : u));
-      setEditModalOpen(false);
-      setNotification({ message: 'Member updated successfully!', type: 'success' });
-  };
-  
-  const handleDeleteUser = async () => {
-      if (!selectedUser) return;
-      try {
-          await api.deleteUser(selectedUser._id);
-          setUsers(users.filter(u => u._id !== selectedUser._id));
-          setDeleteModalOpen(false);
-          setNotification({ message: 'Member deleted successfully.', type: 'success' });
-      } catch (error) {
-          console.error("Failed to delete user", error);
-          setNotification({ message: 'Failed to delete member.', type: 'error' });
-      }
-  };
-
-  const openEditModal = (user: User) => {
-      setSelectedUser(user);
-      setEditModalOpen(true);
-  };
-  
-  const openDeleteModal = (user: User) => {
-      setSelectedUser(user);
-      setDeleteModalOpen(true);
-  };
+  const handleDataChanged = () => {
+    fetchUsers(); // Re-fetch all users to reflect changes
+  }
 
   const openProfileModal = (user: User) => {
     setSelectedUser(user);
@@ -142,11 +113,7 @@ export const MembersList: React.FC = () => {
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-center">
-                                    <div className="flex items-center justify-center space-x-2">
-                                        <Button variant="secondary" className="!p-2" onClick={() => openProfileModal(user)}>View</Button>
-                                        <Button variant="primary" className="!p-2" onClick={() => openEditModal(user)}>Edit</Button>
-                                        <Button variant="danger" className="!p-2" onClick={() => openDeleteModal(user)}>Delete</Button>
-                                    </div>
+                                    <Button variant="secondary" onClick={() => openProfileModal(user)}>View Profile</Button>
                                 </td>
                             </tr>
                         ))}
@@ -161,24 +128,13 @@ export const MembersList: React.FC = () => {
         onClose={() => setAddModalOpen(false)}
         onMemberAdded={handleMemberAdded}
       />
-      <EditMemberForm
-        isOpen={isEditModalOpen}
-        onClose={() => setEditModalOpen(false)}
-        onMemberUpdated={handleMemberUpdated}
-        member={selectedUser}
-      />
-      <ConfirmationModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        onConfirm={handleDeleteUser}
-        title="Delete Member"
-        message={`Are you sure you want to delete ${selectedUser?.name}? This action cannot be undone.`}
-      />
+      
       <MemberProfile
         isOpen={isProfileModalOpen}
         onClose={() => setProfileModalOpen(false)}
         member={selectedUser}
         setNotification={setNotification}
+        onDataChanged={handleDataChanged}
       />
     </>
   );
