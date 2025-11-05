@@ -81,53 +81,55 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activePage, setPage, sid
                     </linearGradient>
                 </defs>
                 <rect fill="#10B981" width="32" height="32" rx="16"></rect>
-                <path d="M18.277.16C26.035 1.267 32 7.938 32 16c0 8.837-7.163 16-16 16A16 16 0 010 16C0 7.938 5.965 1.267 13.723.16 13.723.16 13.73.001 14.28.001h3.444c.55 0 .556.159.556.159z" fill="url(#logo-a)"></path>
-                <path d="M18.277.16C26.035 1.267 32 7.938 32 16c0 8.837-7.163 16-16 16A16 16 0 010 16C0 7.938 5.965 1.267 13.723.16 13.723.16 13.73.001 14.28.001h3.444c.55 0 .556.159.556.159z" fill="url(#logo-b)" transform="rotate(180 16 16)"></path>
+                <path d="M18.277.16C26.035 1.267 32 7.938 32 16c0 8.837-7.163 16-16 16S0 24.837 0 16c0-7.245 4.814-13.448 11.523-15.402l-1.35-2.295C4.245.962 0 7.85 0 16c0 9.925 8.075 18 18 18s18-8.075 18-18c0-8.73-6.24-16.113-14.534-17.653l-1.189 2.813z" fill="url(#logo-a)"></path>
+                <path d="M14.03-2.223C5.23-.236 0 7.065 0 16c0 8.837 7.163 16 16 16s16-7.163 16-16c0-7.94-5.738-14.593-13.35-16.03l-1.62 2.65C23.23 4.14 28 9.53 28 16c0 7.73-6.27 14-14 14S4 23.73 4 16c0-6.17 3.947-11.443 9.48-13.344l-1.45-2.879z" fill="url(#logo-b)"></path>
             </svg>
-            <span className="text-2xl font-bold text-white lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">ClubPro</span>
+            <div className="text-white font-bold text-xl opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">ClubPro</div>
           </a>
         </div>
-        
+
         {/* Links */}
-        <div className="space-y-2 flex-grow">
-          {navLinks.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => {
-                setPage(id);
-                setSidebarOpen(false);
-              }}
-              className={`w-full text-left px-3 py-2 rounded-lg transition-colors duration-150 flex items-center ${
-                activePage === id ? 'bg-cricket-green-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <Icon className="w-6 h-6 shrink-0" />
-              <span className="ml-4 font-medium text-sm lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">{label}</span>
-            </button>
-          ))}
+        <div className="space-y-4">
+          <h3 className="text-xs uppercase text-slate-500 font-semibold pl-3 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">Menu</h3>
+          <ul className="space-y-2">
+            {navLinks.map(link => (
+              <li key={link.id}>
+                <button
+                  onClick={() => setPage(link.id)}
+                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors duration-150 ${
+                    activePage === link.id ? 'bg-cricket-green-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <link.icon className="w-6 h-6 shrink-0" />
+                    <span className="ml-3 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">{link.label}</span>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
         
-        {/* Bottom actions */}
-        <div className="pt-3 mt-3 border-t border-slate-700">
-             <button
-              onClick={() => {
-                setPage('settings');
-                setSidebarOpen(false);
-              }}
-              className={`w-full text-left px-3 py-2 rounded-lg transition-colors duration-150 flex items-center mb-2 ${
-                activePage === 'settings' ? 'bg-cricket-green-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <SettingsIcon className="w-6 h-6 shrink-0" />
-              <span className="ml-4 font-medium text-sm lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">Settings</span>
-            </button>
-            <button
-              onClick={onLogout}
-              className="w-full text-left px-3 py-2 rounded-lg transition-colors duration-150 flex items-center text-slate-400 hover:text-white hover:bg-slate-700/50"
-            >
-                <LogoutIcon className="w-6 h-6 shrink-0"/>
-                <span className="ml-4 font-medium text-sm lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">Logout</span>
-            </button>
+        {/* Sidebar Footer */}
+        <div className="mt-auto">
+            <ul className="space-y-2">
+                <li>
+                    <button onClick={() => setPage('settings')} className={`w-full text-left px-3 py-2 rounded-lg transition-colors duration-150 ${activePage === 'settings' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                        <div className="flex items-center">
+                            <SettingsIcon className="w-6 h-6 shrink-0" />
+                            <span className="ml-3 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">Settings</span>
+                        </div>
+                    </button>
+                </li>
+                 <li>
+                    <button onClick={onLogout} className="w-full text-left px-3 py-2 rounded-lg transition-colors duration-150 text-slate-400 hover:bg-slate-800 hover:text-white">
+                        <div className="flex items-center">
+                            <LogoutIcon className="w-6 h-6 shrink-0" />
+                            <span className="ml-3 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">Logout</span>
+                        </div>
+                    </button>
+                </li>
+            </ul>
         </div>
       </div>
     </div>

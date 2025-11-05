@@ -16,27 +16,71 @@ const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 // Helper to generate IDs
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-let users = [...mockData.users];
-let payments = [...mockData.payments];
-let events = [...mockData.events];
-let expenses = [...mockData.expenses];
-let paymentQRCodeUrl = mockData.paymentQRCodeUrl;
 
-// Simulate a password store
-const passwords: { [userId: string]: string } = {
-    'admin1': 'password',
-    'member1': 'password',
-    'member2': 'password',
-    'member3': 'password',
+// --- LocalStorage Database Implementation ---
+
+const DB_KEYS = {
+  USERS: 'clubpro_users',
+  PAYMENTS: 'clubpro_payments',
+  EVENTS: 'clubpro_events',
+  EXPENSES: 'clubpro_expenses',
+  QR_CODE: 'clubpro_qr_code',
+  PASSWORDS: 'clubpro_passwords',
+  RESET_TOKENS: 'clubpro_reset_tokens',
 };
 
-// Simulate password reset tokens
-const resetTokens: { [token: string]: string } = {};
+// Helper to get data from localStorage
+const getData = <T>(key: string, defaultValue: T): T => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    console.error(`Error reading from localStorage key "${key}":`, error);
+    return defaultValue;
+  }
+};
 
+// Helper to set data in localStorage
+const setData = <T>(key: string, value: T): void => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error(`Error writing to localStorage key "${key}":`, error);
+  }
+};
+
+// Initialize the "database" if it doesn't exist
+const initializeDatabase = () => {
+  if (localStorage.getItem(DB_KEYS.USERS) === null) {
+    console.log("Initializing database from mock data...");
+    setData(DB_KEYS.USERS, mockData.users);
+    setData(DB_KEYS.PAYMENTS, mockData.payments);
+    setData(DB_KEYS.EVENTS, mockData.events);
+    setData(DB_KEYS.EXPENSES, mockData.expenses);
+    setData(DB_KEYS.QR_CODE, mockData.paymentQRCodeUrl);
+    
+    const initialPasswords: { [userId: string]: string } = {
+        'admin1': 'password',
+        'member1': 'password',
+        'member2': 'password',
+        'member3': 'password',
+    };
+    setData(DB_KEYS.PASSWORDS, initialPasswords);
+    setData(DB_KEYS.RESET_TOKENS, {});
+  }
+};
+
+// Run initialization on script load
+initializeDatabase();
+
+
+// --- Refactored API Service ---
 
 export const api = {
   login: async (email: string, password: string): Promise<User> => {
     await delay(500);
+    const users = getData<User[]>(DB_KEYS.USERS, []);
+    const passwords = getData<{ [id: string]: string }>(DB_KEYS.PASSWORDS, {});
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (user && passwords[user._id] === password) {
       return Promise.resolve(user);
@@ -46,6 +90,7 @@ export const api = {
   
   register: async (data: { name: string, email: string, phone: string, password: string }): Promise<User> => {
       await delay(700);
+      const users = getData<User[]>(DB_KEYS.USERS, []);
       if (users.some(u => u.email.toLowerCase() === data.email.toLowerCase())) {
           return Promise.reject(new Error("An account with this email already exists."));
       }
@@ -61,32 +106,39 @@ export const api = {
           joinDate: new Date().toISOString(),
       };
       
-      users = [newUser, ...users];
+      setData(DB_KEYS.USERS, [newUser, ...users]);
+      const passwords = getData<{ [id: string]: string }>(DB_KEYS.PASSWORDS, {});
       passwords[newUser._id] = data.password;
+      setData(DB_KEYS.PASSWORDS, passwords);
       
       return Promise.resolve(newUser);
   },
 
   requestPasswordReset: async (email: string): Promise<string> => {
     await delay(1000);
+    const users = getData<User[]>(DB_KEYS.USERS, []);
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (user) {
         const token = `reset_${generateId()}`;
+        const resetTokens = getData<{ [token: string]: string }>(DB_KEYS.RESET_TOKENS, {});
         resetTokens[token] = user._id;
-        // In a real app, you would email this token to the user.
-        // We return it here for simulation purposes.
+        setData(DB_KEYS.RESET_TOKENS, resetTokens);
         return Promise.resolve(token);
     }
-    // Don't reveal if an email exists or not for security
     return Promise.resolve("OK"); 
   },
 
   resetPassword: async (token: string, newPassword: string): Promise<void> => {
       await delay(1000);
+      const resetTokens = getData<{ [token: string]: string }>(DB_KEYS.RESET_TOKENS, {});
       const userId = resetTokens[token];
-      if (userId && users.some(u => u._id === userId)) {
+
+      if (userId && getData<User[]>(DB_KEYS.USERS, []).some(u => u._id === userId)) {
+          const passwords = getData<{ [id: string]: string }>(DB_KEYS.PASSWORDS, {});
           passwords[userId] = newPassword;
+          setData(DB_KEYS.PASSWORDS, passwords);
           delete resetTokens[token];
+          setData(DB_KEYS.RESET_TOKENS, resetTokens);
           return Promise.resolve();
       }
       return Promise.reject(new Error("Invalid or expired reset token."));
@@ -94,7 +146,7 @@ export const api = {
 
   getAllUsers: async (): Promise<User[]> => {
     await delay(500);
-    return Promise.resolve(users);
+    return Promise.resolve(getData<User[]>(DB_KEYS.USERS, []));
   },
 
   addUser: async (userData: Omit<User, '_id' | 'avatar' | 'joinDate'>): Promise<User> => {
@@ -105,26 +157,35 @@ export const api = {
       avatar: `https://i.pravatar.cc/150?u=${generateId()}`,
       joinDate: new Date().toISOString(),
     };
-    users = [newUser, ...users];
-    // Assign a default password for admin-added users
+    
+    const users = getData<User[]>(DB_KEYS.USERS, []);
+    setData(DB_KEYS.USERS, [newUser, ...users]);
+    
+    const passwords = getData<{ [id: string]: string }>(DB_KEYS.PASSWORDS, {});
     passwords[newUser._id] = 'password';
+    setData(DB_KEYS.PASSWORDS, passwords);
     return Promise.resolve(newUser);
   },
 
   updateUser: async (userId: string, updates: Partial<User>): Promise<User> => {
     await delay(500);
+    const users = getData<User[]>(DB_KEYS.USERS, []);
     let updatedUser: User | undefined;
-    users = users.map(u => {
+    const updatedUsers = users.map(u => {
       if (u._id === userId) {
         updatedUser = { ...u, ...updates };
         return updatedUser;
       }
       return u;
     });
+
     if (updatedUser) {
-      // Also update payment author info if name/avatar changed
+      setData(DB_KEYS.USERS, updatedUsers);
+      
       if (updates.name || updates.avatar) {
-        payments = payments.map(p => p.userId === userId ? {...p, userName: updatedUser!.name, userAvatar: updatedUser!.avatar} : p);
+        const payments = getData<Payment[]>(DB_KEYS.PAYMENTS, []);
+        const updatedPayments = payments.map(p => p.userId === userId ? {...p, userName: updatedUser!.name, userAvatar: updatedUser!.avatar} : p);
+        setData(DB_KEYS.PAYMENTS, updatedPayments);
       }
       return Promise.resolve(updatedUser);
     }
@@ -133,10 +194,13 @@ export const api = {
 
   deleteUser: async (userId: string): Promise<void> => {
     await delay(500);
+    const users = getData<User[]>(DB_KEYS.USERS, []);
     const userExists = users.some(u => u._id === userId);
     if (userExists) {
-        users = users.filter(u => u._id !== userId);
+        setData(DB_KEYS.USERS, users.filter(u => u._id !== userId));
+        const passwords = getData<{ [id: string]: string }>(DB_KEYS.PASSWORDS, {});
         delete passwords[userId];
+        setData(DB_KEYS.PASSWORDS, passwords);
         return Promise.resolve();
     }
     return Promise.reject(new Error('User not found'));
@@ -144,10 +208,12 @@ export const api = {
 
   getDashboardStats: async (userId: string, role: UserRole): Promise<any> => {
     await delay(500);
+    const users = getData<User[]>(DB_KEYS.USERS, []);
+    const payments = getData<Payment[]>(DB_KEYS.PAYMENTS, []);
+    const events = getData<Event[]>(DB_KEYS.EVENTS, []);
+
     if (role === UserRole.ADMIN) {
-      const totalRevenue = payments
-        .filter(p => p.status === PaymentStatus.PAID)
-        .reduce((sum, p) => sum + p.amount, 0);
+      const totalRevenue = payments.filter(p => p.status === PaymentStatus.PAID).reduce((sum, p) => sum + p.amount, 0);
       const pendingVerifications = payments.filter(p => p.status === PaymentStatus.PENDING && p.proofDocument).length;
       return {
         totalMembers: users.filter(u => u.role === UserRole.MEMBER).length,
@@ -157,11 +223,8 @@ export const api = {
       };
     } else {
       const userPayments = payments.filter(p => p.userId === userId);
-      // Corrected typo from OVERDUT to OVERDUE.
       const pendingPayments = userPayments.filter(p => p.status === PaymentStatus.PENDING || p.status === PaymentStatus.OVERDUE).length;
-      const totalPaid = userPayments
-        .filter(p => p.status === PaymentStatus.PAID)
-        .reduce((sum, p) => sum + p.amount, 0);
+      const totalPaid = userPayments.filter(p => p.status === PaymentStatus.PAID).reduce((sum, p) => sum + p.amount, 0);
       return {
         pendingPayments,
         totalPaid,
@@ -172,16 +235,19 @@ export const api = {
   
   getPaymentsForUser: async (userId: string): Promise<Payment[]> => {
     await delay(500);
+    const payments = getData<Payment[]>(DB_KEYS.PAYMENTS, []);
     return Promise.resolve(payments.filter(p => p.userId === userId).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   },
 
   getAllPayments: async (): Promise<Payment[]> => {
       await delay(500);
+      const payments = getData<Payment[]>(DB_KEYS.PAYMENTS, []);
       return Promise.resolve(payments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   },
 
   getRecentPayments: async (): Promise<Payment[]> => {
       await delay(500);
+      const payments = getData<Payment[]>(DB_KEYS.PAYMENTS, []);
       return Promise.resolve(
           payments
               .filter(p => p.status === PaymentStatus.PAID)
@@ -192,39 +258,49 @@ export const api = {
 
   getPendingPayments: async (): Promise<Payment[]> => {
       await delay(500);
+      const payments = getData<Payment[]>(DB_KEYS.PAYMENTS, []);
       return Promise.resolve(payments.filter(p => p.status === PaymentStatus.PENDING && p.proofDocument));
   },
 
   submitPaymentProof: async (paymentId: string, proofDocument: string): Promise<Payment> => {
       await delay(500);
+      const payments = getData<Payment[]>(DB_KEYS.PAYMENTS, []);
       let updatedPayment: Payment | undefined;
-      payments = payments.map(p => {
+      const updatedPayments = payments.map(p => {
           if (p._id === paymentId) {
               updatedPayment = { ...p, proofDocument };
               return updatedPayment;
           }
           return p;
       });
-      if (updatedPayment) return Promise.resolve(updatedPayment);
+      if (updatedPayment) {
+        setData(DB_KEYS.PAYMENTS, updatedPayments);
+        return Promise.resolve(updatedPayment);
+      }
       return Promise.reject(new Error('Payment not found'));
   },
 
   verifyPayment: async (paymentId: string, status: PaymentStatus, adminNotes: string, verifiedBy: string): Promise<Payment> => {
       await delay(500);
+      const payments = getData<Payment[]>(DB_KEYS.PAYMENTS, []);
       let updatedPayment: Payment | undefined;
-      payments = payments.map(p => {
+      const updatedPayments = payments.map(p => {
           if (p._id === paymentId) {
               updatedPayment = { ...p, status, adminNotes, verifiedBy };
               return updatedPayment;
           }
           return p;
       });
-      if (updatedPayment) return Promise.resolve(updatedPayment);
+      if (updatedPayment) {
+        setData(DB_KEYS.PAYMENTS, updatedPayments);
+        return Promise.resolve(updatedPayment);
+      }
       return Promise.reject(new Error('Payment not found'));
   },
   
   createPaymentRequest: async (data: { userId: string; type: string; amount: number; dueDate: string }): Promise<Payment> => {
       await delay(500);
+      const users = getData<User[]>(DB_KEYS.USERS, []);
       const user = users.find(u => u._id === data.userId);
       if (!user) return Promise.reject(new Error('User not found'));
 
@@ -240,12 +316,16 @@ export const api = {
           dueDate: new Date(data.dueDate).toISOString(),
           paymentMethod: '',
       };
-      payments = [newPayment, ...payments];
+      
+      const payments = getData<Payment[]>(DB_KEYS.PAYMENTS, []);
+      setData(DB_KEYS.PAYMENTS, [newPayment, ...payments]);
       return Promise.resolve(newPayment);
   },
   
   createBulkPaymentRequest: async (data: { userIds: string[]; type: string; amount: number; dueDate: string }): Promise<void> => {
       await delay(1000);
+      const users = getData<User[]>(DB_KEYS.USERS, []);
+      const payments = getData<Payment[]>(DB_KEYS.PAYMENTS, []);
       const newPayments: Payment[] = [];
       for (const userId of data.userIds) {
           const user = users.find(u => u._id === userId);
@@ -264,12 +344,13 @@ export const api = {
               });
           }
       }
-      payments = [...newPayments, ...payments];
+      setData(DB_KEYS.PAYMENTS, [...newPayments, ...payments]);
       return Promise.resolve();
   },
 
   getUpcomingEvents: async (): Promise<Event[]> => {
       await delay(500);
+      const events = getData<Event[]>(DB_KEYS.EVENTS, []);
       return Promise.resolve(events.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
   },
 
@@ -280,12 +361,16 @@ export const api = {
           ...eventData,
           attendees: [],
       };
-      events = [newEvent, ...events];
+      const events = getData<Event[]>(DB_KEYS.EVENTS, []);
+      setData(DB_KEYS.EVENTS, [newEvent, ...events]);
       return Promise.resolve(newEvent);
   },
 
   getEventPaymentStatus: async (eventId: string): Promise<any[]> => {
       await delay(700);
+      const events = getData<Event[]>(DB_KEYS.EVENTS, []);
+      const users = getData<User[]>(DB_KEYS.USERS, []);
+      const payments = getData<Payment[]>(DB_KEYS.PAYMENTS, []);
       const event = events.find(e => e._id === eventId);
       if (!event) return Promise.reject(new Error("Event not found"));
       
@@ -319,7 +404,7 @@ export const api = {
 
   getAllExpenses: async (): Promise<Expense[]> => {
     await delay(500);
-    return Promise.resolve(expenses);
+    return Promise.resolve(getData<Expense[]>(DB_KEYS.EXPENSES, []));
   },
 
   addExpense: async (expenseData: Omit<Expense, '_id'>): Promise<Expense> => {
@@ -328,12 +413,15 @@ export const api = {
       _id: generateId(),
       ...expenseData,
     };
-    expenses = [newExpense, ...expenses];
+    const expenses = getData<Expense[]>(DB_KEYS.EXPENSES, []);
+    setData(DB_KEYS.EXPENSES, [newExpense, ...expenses]);
     return Promise.resolve(newExpense);
   },
 
   getFinancialSummary: async (): Promise<{ totalRevenue: number, totalExpenses: number, netProfit: number }> => {
     await delay(600);
+    const payments = getData<Payment[]>(DB_KEYS.PAYMENTS, []);
+    const expenses = getData<Expense[]>(DB_KEYS.EXPENSES, []);
     const totalRevenue = payments
       .filter(p => p.status === PaymentStatus.PAID)
       .reduce((sum, p) => sum + p.amount, 0);
@@ -347,12 +435,12 @@ export const api = {
 
   setPaymentQRCode: async(url: string): Promise<void> => {
     await delay(500);
-    paymentQRCodeUrl = url;
+    setData(DB_KEYS.QR_CODE, url);
     return Promise.resolve();
   },
 
   getPaymentQRCode: async(): Promise<string> => {
     await delay(300);
-    return Promise.resolve(paymentQRCodeUrl);
+    return Promise.resolve(getData<string>(DB_KEYS.QR_CODE, ''));
   },
 };
